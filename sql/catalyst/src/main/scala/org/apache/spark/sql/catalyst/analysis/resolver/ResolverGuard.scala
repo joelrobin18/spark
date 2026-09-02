@@ -260,6 +260,7 @@ class ResolverGuard(
 
   private def checkProject(project: Project) = {
     checkProjectHiddenOutputTag(project)
+      .orElse(checkProjectRetainExcludedColumnsTag(project))
       .orElse(checkOperator(project.child))
       .orElse {
         project.projectList.collectFirst { case CheckExpression(reason) => reason }
@@ -716,6 +717,20 @@ class ResolverGuard(
     project.getTagValue(Project.hiddenOutputTag) match {
       case Some(_) => Some("NaturalJoin second resolution")
       case None => None
+    }
+  }
+
+  /**
+   * Check if the [[Project]] was created for a SQL pipe SET or DROP operator, which retains the
+   * columns excluded by its star expansion in the hidden output.
+   *
+   * We currently do not support this, because the excluded columns are only added to the hidden
+   * output by the fixed-point [[Analyzer]].
+   */
+  private def checkProjectRetainExcludedColumnsTag(project: Project): Option[String] = {
+    project.getTagValue(Project.retainExcludedColumnsTag) match {
+      case Some(true) => Some("SQL pipe operator retaining excluded columns")
+      case _ => None
     }
   }
 }

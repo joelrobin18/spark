@@ -361,6 +361,38 @@ values (0), (1) lhs(a)
 |> limit 2
 |> select lhs.a, rhs.a, z2;
 
+-- A table alias remains visible for the column assigned by a SET operator, and still refers to the
+-- original row value while the top-level column name refers to the assigned value.
+values (1, 10) as t(a, b)
+|> set a = a + 1
+|> select t.a;
+
+values (1, 10) as t(a, b)
+|> set a = a + 1
+|> select a, t.a, t.b;
+
+-- The same, with the assigned column referred to by a qualified star.
+values (1, 10) as t(a, b)
+|> set a = a + 1
+|> select t.*;
+
+-- Table aliases remain visible for the columns assigned by two SET operators in sequence.
+values (1, 10) as t(a, b)
+|> set a = a + 1
+|> set b = b + 1
+|> select a, b, t.a, t.b;
+
+-- Assigning the same column two times in sequence retains the original row value.
+values (1, 10) as t(a, b)
+|> set a = a + 1
+|> set a = a + 1
+|> select a, t.a;
+
+-- File source metadata columns remain available after a SET operator.
+table t
+|> set x = x + 1
+|> select x, _metadata.file_name is not null as has_file_name;
+
 -- SET operators: negative tests.
 ---------------------------------
 
@@ -382,6 +414,24 @@ select col from st
 -- Dropping a column.
 table t
 |> drop y;
+
+-- A table alias remains visible for the column dropped by a DROP operator, and still refers to the
+-- original row value.
+values (1, 10) as t(a, b)
+|> drop a
+|> select t.a, b;
+
+-- A table alias remains visible for a struct column whose field a DROP operator removed, and still
+-- refers to the original row value including that field.
+select named_struct('i1', 1, 'i2', 2) as col
+|> as t
+|> drop col.i1
+|> select col, t.col;
+
+-- File source metadata columns remain available after a DROP operator.
+table t
+|> drop y
+|> select x, _metadata.file_name is not null as has_file_name;
 
 -- Dropping two times.
 select 1 as x, 2 as y, 3 as z

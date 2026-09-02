@@ -910,6 +910,69 @@ struct<a:int,a:int,z2:int>
 
 
 -- !query
+values (1, 10) as t(a, b)
+|> set a = a + 1
+|> select t.a
+-- !query schema
+struct<a:int>
+-- !query output
+1
+
+
+-- !query
+values (1, 10) as t(a, b)
+|> set a = a + 1
+|> select a, t.a, t.b
+-- !query schema
+struct<a:int,a:int,b:int>
+-- !query output
+2	1	10
+
+
+-- !query
+values (1, 10) as t(a, b)
+|> set a = a + 1
+|> select t.*
+-- !query schema
+struct<a:int,b:int>
+-- !query output
+1	10
+
+
+-- !query
+values (1, 10) as t(a, b)
+|> set a = a + 1
+|> set b = b + 1
+|> select a, b, t.a, t.b
+-- !query schema
+struct<a:int,b:int,a:int,b:int>
+-- !query output
+2	11	1	10
+
+
+-- !query
+values (1, 10) as t(a, b)
+|> set a = a + 1
+|> set a = a + 1
+|> select a, t.a
+-- !query schema
+struct<a:int,a:int>
+-- !query output
+3	1
+
+
+-- !query
+table t
+|> set x = x + 1
+|> select x, _metadata.file_name is not null as has_file_name
+-- !query schema
+struct<x:int,has_file_name:boolean>
+-- !query output
+1	true
+2	true
+
+
+-- !query
 table t
 |> set z = 1
 -- !query schema
@@ -980,6 +1043,38 @@ struct<x:int>
 -- !query output
 0
 1
+
+
+-- !query
+values (1, 10) as t(a, b)
+|> drop a
+|> select t.a, b
+-- !query schema
+struct<a:int,b:int>
+-- !query output
+1	10
+
+
+-- !query
+select named_struct('i1', 1, 'i2', 2) as col
+|> as t
+|> drop col.i1
+|> select col, t.col
+-- !query schema
+struct<col:struct<i2:int>,col:struct<i1:int,i2:int>>
+-- !query output
+{"i2":2}	{"i1":1,"i2":2}
+
+
+-- !query
+table t
+|> drop y
+|> select x, _metadata.file_name is not null as has_file_name
+-- !query schema
+struct<x:int,has_file_name:boolean>
+-- !query output
+0	true
+1	true
 
 
 -- !query

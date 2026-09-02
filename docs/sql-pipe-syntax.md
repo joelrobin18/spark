@@ -273,7 +273,8 @@ to the result of previous assignments.
 
 After an assignment, top-level column names are updated but table aliases still refer to the
 original row values (such as an inner join between two tables `lhs` and `rhs` with a subsequent
-`SET` and then `SELECT lhs.col, rhs.col`).
+`SET` and then `SELECT lhs.col, rhs.col`). This also holds for the assigned column itself: the
+top-level column name refers to the new value while the table alias refers to the original one.
 
 For example:
 
@@ -288,15 +289,15 @@ VALUES (0), (1) tab(col)
 |  2|
 +---+
 
-VALUES (0), (1) tab(col)
-|> SET col = col * 2;
+VALUES (1, 10) AS t(a, b)
+|> SET a = a + 1
+|> SELECT a AS updated, t.a AS original;
 
-+---+
-|col|
-+---+
-|  0|
-|  2|
-+---+
++-------+--------+
+|updated|original|
++-------+--------+
+|      2|       1|
++-------+--------+
 ```
 
 #### DROP
@@ -312,7 +313,8 @@ This is similar to `SELECT * EXCEPT (column)` in regular Spark SQL.
 
 After a `DROP` operation, top-level column names are updated but table aliases still refer to the
 original row values (such as an inner join between two tables `lhs` and `rhs` with a subsequent
-`DROP` and then `SELECT lhs.col, rhs.col`).
+`DROP` and then `SELECT lhs.col, rhs.col`). This also holds for the dropped column itself, which
+remains available through a table alias.
 
 For example:
 
@@ -325,6 +327,16 @@ VALUES (0, 1) tab(col1, col2)
 +----+
 |   1|
 +----+
+
+VALUES (1, 10) AS t(a, b)
+|> DROP a
+|> SELECT t.a, b;
+
++---+---+
+|  a|  b|
++---+---+
+|  1| 10|
++---+---+
 ```
 
 #### AS

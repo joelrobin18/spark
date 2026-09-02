@@ -8087,7 +8087,11 @@ class AstBuilder extends DataTypeAstBuilder
       val projectList: Seq[NamedExpression] =
         Seq(UnresolvedStarExceptOrReplace(
           target = None, excepts = ids, replacements = None))
-      Project(projectList, left)
+      // Retain the dropped columns in the projection's hidden output so that any prior table alias
+      // keeps referring to the original row value, e.g. `t.a` after `|> DROP a`.
+      val project = Project(projectList, left)
+      project.setTagValue(Project.retainExcludedColumnsTag, true)
+      project
     }.getOrElse(Option(ctx.AS).map { _ =>
       SubqueryAlias(getIdentifierText(ctx.errorCapturingIdentifier()), left)
     }.getOrElse(Option(ctx.whereClause).map { c =>
@@ -8142,7 +8146,11 @@ class AstBuilder extends DataTypeAstBuilder
         // Add a projection to implement the SET operator using the UnresolvedStarExceptOrReplace
         // expression. We do this once per SET assignment to allow for multiple SET assignments with
         // optional lateral references to previous ones.
-        plan = Project(projectList, plan)
+        // Retain the assigned column in the projection's hidden output so that any prior table
+        // alias keeps referring to the original row value, e.g. `t.a` after `|> SET a = a + 1`.
+        val project = Project(projectList, plan)
+        project.setTagValue(Project.retainExcludedColumnsTag, true)
+        plan = project
     }
     plan
   }

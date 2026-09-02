@@ -993,6 +993,76 @@ Project [a#x, a#x, z2#x]
 
 
 -- !query
+values (1, 10) as t(a, b)
+|> set a = a + 1
+|> select t.a
+-- !query analysis
+Project [a#x]
++- Project [(a#x + 1) AS a#x, b#x, a#x]
+   +- SubqueryAlias t
+      +- LocalRelation [a#x, b#x]
+
+
+-- !query
+values (1, 10) as t(a, b)
+|> set a = a + 1
+|> select a, t.a, t.b
+-- !query analysis
+Project [a#x, a#x, b#x]
++- Project [(a#x + 1) AS a#x, b#x, a#x]
+   +- SubqueryAlias t
+      +- LocalRelation [a#x, b#x]
+
+
+-- !query
+values (1, 10) as t(a, b)
+|> set a = a + 1
+|> select t.*
+-- !query analysis
+Project [a#x, b#x]
++- Project [(a#x + 1) AS a#x, b#x, a#x]
+   +- SubqueryAlias t
+      +- LocalRelation [a#x, b#x]
+
+
+-- !query
+values (1, 10) as t(a, b)
+|> set a = a + 1
+|> set b = b + 1
+|> select a, b, t.a, t.b
+-- !query analysis
+Project [a#x, b#x, a#x, b#x]
++- Project [a#x, (b#x + 1) AS b#x, b#x, a#x]
+   +- Project [(a#x + 1) AS a#x, b#x, a#x]
+      +- SubqueryAlias t
+         +- LocalRelation [a#x, b#x]
+
+
+-- !query
+values (1, 10) as t(a, b)
+|> set a = a + 1
+|> set a = a + 1
+|> select a, t.a
+-- !query analysis
+Project [a#x, a#x]
++- Project [(a#x + 1) AS a#x, b#x, a#x]
+   +- Project [(a#x + 1) AS a#x, b#x, a#x]
+      +- SubqueryAlias t
+         +- LocalRelation [a#x, b#x]
+
+
+-- !query
+table t
+|> set x = x + 1
+|> select x, _metadata.file_name is not null as has_file_name
+-- !query analysis
+Project [x#x, isnotnull(_metadata#x.file_name) AS has_file_name#x]
++- Project [(x#x + 1) AS x#x, y#x, _metadata#x]
+   +- SubqueryAlias spark_catalog.default.t
+      +- Relation spark_catalog.default.t[x#x,y#x,_metadata#x] csv
+
+
+-- !query
 table t
 |> set z = 1
 -- !query analysis
@@ -1056,6 +1126,41 @@ table t
 Project [x#x]
 +- SubqueryAlias spark_catalog.default.t
    +- Relation spark_catalog.default.t[x#x,y#x] csv
+
+
+-- !query
+values (1, 10) as t(a, b)
+|> drop a
+|> select t.a, b
+-- !query analysis
+Project [a#x, b#x]
++- Project [b#x, a#x]
+   +- SubqueryAlias t
+      +- LocalRelation [a#x, b#x]
+
+
+-- !query
+select named_struct('i1', 1, 'i2', 2) as col
+|> as t
+|> drop col.i1
+|> select col, t.col
+-- !query analysis
+Project [col#x, col#x]
++- Project [named_struct(i2, col#x.i2) AS col#x, col#x]
+   +- SubqueryAlias t
+      +- Project [named_struct(i1, 1, i2, 2) AS col#x]
+         +- OneRowRelation
+
+
+-- !query
+table t
+|> drop y
+|> select x, _metadata.file_name is not null as has_file_name
+-- !query analysis
+Project [x#x, isnotnull(_metadata#x.file_name) AS has_file_name#x]
++- Project [x#x, _metadata#x]
+   +- SubqueryAlias spark_catalog.default.t
+      +- Relation spark_catalog.default.t[x#x,y#x,_metadata#x] csv
 
 
 -- !query

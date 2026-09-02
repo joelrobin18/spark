@@ -119,6 +119,18 @@ case class Project(projectList: Seq[NamedExpression], child: LogicalPlan)
 object Project {
   val hiddenOutputTag: TreeNodeTag[Seq[Attribute]] = TreeNodeTag[Seq[Attribute]]("hidden_output")
 
+  /**
+   * Marks a [[Project]] whose project list is a star expansion excluding some of the child's
+   * columns, so that those excluded columns are retained in the project's hidden output as
+   * qualified-access-only columns once the star is expanded.
+   *
+   * This is set by the parser for the SQL pipe SET and DROP operators, whose documented behavior
+   * is that top-level column names are updated but table aliases keep referring to the original
+   * row values. For example, `t.a` still returns the input value after `|> SET a = a + 1`.
+   */
+  val retainExcludedColumnsTag: TreeNodeTag[Boolean] =
+    TreeNodeTag[Boolean]("retain_excluded_columns")
+
   def matchSchema(plan: LogicalPlan, schema: StructType, conf: SQLConf): Project = {
     assert(plan.resolved)
     val projectList =

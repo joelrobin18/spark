@@ -1701,6 +1701,7 @@ class Analyzer(
         if (expanded.projectList.size < p.projectList.size) {
           checkTrailingCommaInSelect(expanded, starRemoved = true)
         }
+        retainExcludedColumns(p, expanded)
         expanded
       // If the filter list contains Stars, expand it.
       case p: Filter if containsStar(Seq(p.condition)) =>
@@ -2083,6 +2084,41 @@ class Analyzer(
         case o if containsStar(o :: Nil) => expandStarExpression(o, child) :: Nil
         case o => o :: Nil
       }.map(_.asInstanceOf[NamedExpression])
+    }
+
+    /**
+     * For a [[Project]] marked with [[Project.retainExcludedColumnsTag]], retains the child columns
+     * that the star expansion excluded in the expanded project's hidden output, as
+     * qualified-access-only columns.
+     *
+     * This is what keeps prior table aliases referring to the original row values after the SQL
+     * pipe SET and DROP operators: `t.a` resolves to the original input column while the
+     * unqualified `a` resolves to the assigned one, and neither the output schema nor `SELECT *`
+     * is affected. Excluded columns without a qualifier are skipped, since nothing could
+     * reference them.
+     */
+    private def retainExcludedColumns(project: Project, expanded: Project): Unit = {
+      import org.apache.spark.sql.catalyst.util._
+
+      if (project.getTagValue(Project.retainExcludedColumnsTag).contains(true)) {
+        // Columns kept by the star expansion are passed through as attributes; an excluded column
+        // is either gone or rewritten into a new expression with a new expression ID.
+        val keptExprIds = expanded.projectList.collect { case attr: Attribute => attr.exprId }.toSet
+        val excluded = project.child.output.filter { attr =>
+          !keptExprIds.contains(attr.exprId) && attr.qualifier.nonEmpty
+        }
+        // The tag replaces the child's metadata output entirely, so carry all of it over: this
+        // keeps the columns hidden by chained SET and DROP operators reachable, and preserves
+        // metadata columns such as `_metadata` that are not qualified-access-only. The newly
+        // excluded columns take precedence over any older version of themselves.
+        val excludedExprIds = excluded.map(_.exprId).toSet
+        val hidden = excluded.map(_.markAsQualifiedAccessOnly()) ++
+          project.child.metadataOutput.filterNot(attr => excludedExprIds.contains(attr.exprId))
+        if (excluded.nonEmpty) {
+          expanded.copyTagsFrom(project)
+          expanded.setTagValue(Project.hiddenOutputTag, hidden)
+        }
+      }
     }
 
     /**
